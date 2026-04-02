@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>admin — status.akn.me.uk</title>
+  <link rel="stylesheet" href="index.css" />
+  <style>
+    .admin-wrap { max-width: 640px; margin: 0 auto; padding: 40px 20px 80px; text-align: left; }
+    .admin-header { display: flex; align-items: center; gap: 16px; margin-bottom: 32px; flex-wrap: wrap; }
+    .admin-header h1 { font-size: 20px; }
+    .back { font-size: 13px; color: #999; text-decoration: none; }
+    .back:hover { color: #555; }
+    .msg { font-size: 13px; color: #16a34a; margin-left: auto; }
+    .msg.err { color: #dc2626; }
+    section { margin-bottom: 36px; }
+    h2 { font-size: 11px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: #999; margin: 0 0 12px; }
+    .row { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid #eee; }
+    @media (prefers-color-scheme: dark) { .row { border-color: #2a2a2a; } }
+    .row-info { flex: 1; min-width: 0; }
+    .row-info strong { display: block; font-size: 14px; color: #3b3b3b; }
+    @media (prefers-color-scheme: dark) { .row-info strong { color: #e7e5e4; } }
+    .row-info small { display: block; font-size: 12px; color: #aaa; margin-top: 2px; }
+    .row-info p { font-size: 13px; color: #888; margin: 4px 0 0; }
+    .btn { border: 1px solid #ddd; border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer; background: transparent; font-family: inherit; white-space: nowrap; }
+    .btn:disabled { opacity: 0.4; cursor: default; }
+    .btn-resolve { color: #16a34a; border-color: rgba(22,163,74,.3); }
+    .btn-resolve:hover:not(:disabled) { background: rgba(22,163,74,.08); }
+    .btn-remove { color: #dc2626; border-color: rgba(220,38,38,.3); }
+    .btn-remove:hover:not(:disabled) { background: rgba(220,38,38,.08); }
+    .empty { font-size: 13px; color: #bbb; margin-bottom: 12px; }
+    form { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+    input, textarea { border: 1px solid #ddd; border-radius: 8px; padding: 8px 12px; font-size: 14px; font-family: inherit; outline: none; background: #fff; color: #333; }
+    @media (prefers-color-scheme: dark) { input, textarea { background: #292524; border-color: #3a3a3a; color: #e7e5e4; } }
+    input:focus, textarea:focus { border-color: rgba(102,126,234,.5); }
+    textarea { resize: vertical; }
+    .submit-btn { align-self: flex-start; background: rgba(102,126,234,.12); color: #4f46e5; border: 1px solid rgba(102,126,234,.25); border-radius: 8px; padding: 8px 20px; font-size: 13px; cursor: pointer; font-family: inherit; }
+    .submit-btn:hover:not(:disabled) { background: rgba(102,126,234,.2); }
+    .submit-btn:disabled { opacity: .4; cursor: default; }
+    #token-gate { max-width: 400px; margin: 80px auto; padding: 0 20px; text-align: center; }
+    #token-gate h2 { font-size: 15px; color: #555; margin-bottom: 16px; text-transform: none; letter-spacing: 0; }
+    #token-gate input { width: 100%; margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+  <div id="token-gate" style="display:none">
+    <h2>Enter GitHub Personal Access Token<br><small style="font-size:11px;color:#aaa">(needs repo write access to akn101/status.akn.me.uk)</small></h2>
+    <input type="password" id="pat-input" placeholder="ghp_..." />
+    <button class="submit-btn" style="width:100%" onclick="saveToken()">Save</button>
+  </div>
+
+  <div id="app" style="display:none" class="admin-wrap">
+    <div class="admin-header">
+      <a href="/" class="back">← status</a>
+      <h1>admin</h1>
+      <span id="msg" class="msg" style="display:none"></span>
+      <button class="btn btn-remove" style="margin-left:auto" onclick="clearToken()">sign out</button>
+    </div>
+
+    <section>
+      <h2>active incidents</h2>
+      <div id="active-incidents"><div class="empty">loading…</div></div>
+      <h2 style="margin-top:24px">create incident</h2>
+      <form onsubmit="createIncident(event)">
+        <input id="inc-title" placeholder="title" required />
+        <input id="inc-service" placeholder="service (e.g. Halcyon)" required />
+        <input id="inc-url" placeholder="url (e.g. https://akn.me.uk)" />
+        <textarea id="inc-desc" placeholder="description" rows="3"></textarea>
+        <button type="submit" class="submit-btn" id="inc-btn">create incident</button>
+      </form>
+    </section>
+
+    <section>
+      <h2>monitored urls</h2>
+      <div id="url-list"><div class="empty">loading…</div></div>
+      <h2 style="margin-top:24px">add url</h2>
+      <form onsubmit="addUrl(event)">
+        <input id="url-name" placeholder="name (e.g. Halcyon)" required />
+        <input id="url-addr" placeholder="url (e.g. https://akn.me.uk)" required />
+        <button type="submit" class="submit-btn" id="url-btn">add url</button>
+      </form>
+    </section>
+  </div>
+
+<script>
+const REPO = 'akn101/status.akn.me.uk';
+const API  = 'https://api.github.com';
+let _sha_incidents = null, _sha_urls = null;
+let _saving = false;
+
+function getToken() { return localStorage.getItem('status_admin_pat'); }
+function saveToken() {
+  const t = document.getElementById('pat-input').value.trim();
+  if (!t) return;
+  localStorage.setItem('status_admin_pat', t);
+  init();
+}
+function clearToken() { localStorage.removeItem('status_admin_pat'); location.reload(); }
+
+function gh(path, opts = {}) {
+  return fetch(`${API}/repos/${REPO}/contents/${path}`, {
+    ...opts,
+    headers: {
+      Authorization: `Bearer ${getToken()}`,
+      Accept: 'application/vnd.github+json',
+      ...(opts.headers || {}),
+    },
+  });
+}
+
+async function ghGet(path) {
+  const r = await gh(path);
+  if (!r.ok) throw new Error(`GET ${path}: ${r.status}`);
+  return r.json();
+}
+
+async function ghPut(path, content, sha, message) {
+  const r = await gh(path, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, content: btoa(unescape(encodeURIComponent(content))), sha }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(JSON.stringify(e)); }
+  return r.json();
+}
+
+function flash(msg, err = false) {
+  const el = document.getElementById('msg');
+  el.textContent = msg;
+  el.className = 'msg' + (err ? ' err' : '');
+  el.style.display = '';
+  setTimeout(() => { el.style.display = 'none'; }, 3000);
+}
+
+function setSaving(v) {
+  _saving = v;
+  document.querySelectorAll('button').forEach(b => b.disabled = v);
+}
+
+async function load() {
+  const [incFile, urlFile] = await Promise.all([ghGet('incidents.json'), ghGet('urls.cfg')]);
+  _sha_incidents = incFile.sha;
+  _sha_urls = urlFile.sha;
+  const incidents = JSON.parse(decodeURIComponent(escape(atob(incFile.content))));
+  const urlsRaw = decodeURIComponent(escape(atob(urlFile.content)));
+  renderIncidents(incidents.active || []);
+  renderUrls(urlsRaw);
+  return { incidents, urlsRaw };
+}
+
+function renderIncidents(active) {
+  const el = document.getElementById('active-incidents');
+  if (!active.length) { el.innerHTML = '<div class="empty">no active incidents</div>'; return; }
+  el.innerHTML = active.map(inc => `
+    <div class="row">
+      <div class="row-info">
+        <strong>${esc(inc.title)}</strong>
+        <small>${esc(inc.service)} · ${new Date(inc.startTime).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</small>
+        ${inc.description ? `<p>${esc(inc.description)}</p>` : ''}
+      </div>
+      <button class="btn btn-resolve" onclick="resolveIncident('${esc(inc.incidentId)}')">resolve</button>
+    </div>
+  `).join('');
+}
+
+function renderUrls(raw) {
+  const urls = raw.split('\n').filter(Boolean).map(l => {
+    const [name, ...rest] = l.split('=');
+    return { name: name.trim(), url: rest.join('=').trim() };
+  }).filter(u => u.name && u.url);
+  const el = document.getElementById('url-list');
+  el.innerHTML = urls.map(u => `
+    <div class="row">
+      <div class="row-info">
+        <strong>${esc(u.name)}</strong>
+        <small><a href="${esc(u.url)}" target="_blank" rel="noreferrer">${esc(u.url)}</a></small>
+      </div>
+      <button class="btn btn-remove" onclick="removeUrl('${esc(u.name)}')">remove</button>
+    </div>
+  `).join('');
+}
+
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+async function createIncident(e) {
+  e.preventDefault();
+  if (_saving) return;
+  setSaving(true);
+  try {
+    const incFile = await ghGet('incidents.json');
+    const incidents = JSON.parse(decodeURIComponent(escape(atob(incFile.content))));
+    const now = new Date().toISOString();
+    const title = document.getElementById('inc-title').value.trim();
+    const service = document.getElementById('inc-service').value.trim();
+    const url = document.getElementById('inc-url').value.trim();
+    const description = document.getElementById('inc-desc').value.trim();
+    incidents.active.unshift({
+      incidentId: `${service}-${now}`,
+      date: now.split('T')[0],
+      startTime: now,
+      endTime: now,
+      title, description, service, url,
+      status: 'investigating',
+    });
+    await ghPut('incidents.json', JSON.stringify(incidents, null, 2), incFile.sha, `incident: ${title}`);
+    document.getElementById('inc-title').value = '';
+    document.getElementById('inc-service').value = '';
+    document.getElementById('inc-url').value = '';
+    document.getElementById('inc-desc').value = '';
+    flash('Incident created');
+    await load();
+  } catch(err) { flash(err.message, true); }
+  setSaving(false);
+}
+
+async function resolveIncident(id) {
+  if (_saving) return;
+  setSaving(true);
+  try {
+    const incFile = await ghGet('incidents.json');
+    const incidents = JSON.parse(decodeURIComponent(escape(atob(incFile.content))));
+    const idx = incidents.active.findIndex(i => i.incidentId === id);
+    if (idx === -1) throw new Error('not found');
+    const inc = incidents.active[idx];
+    const now = new Date();
+    const resolved = { ...inc, endTime: now.toISOString(), resolved: `${now.toUTCString()} - Service restored` };
+    delete resolved.status;
+    incidents.active.splice(idx, 1);
+    incidents.resolved.unshift(resolved);
+    await ghPut('incidents.json', JSON.stringify(incidents, null, 2), incFile.sha, `incident resolved: ${inc.title}`);
+    flash('Resolved');
+    await load();
+  } catch(err) { flash(err.message, true); }
+  setSaving(false);
+}
+
+async function addUrl(e) {
+  e.preventDefault();
+  if (_saving) return;
+  setSaving(true);
+  try {
+    const urlFile = await ghGet('urls.cfg');
+    const current = decodeURIComponent(escape(atob(urlFile.content)));
+    const name = document.getElementById('url-name').value.trim();
+    const url = document.getElementById('url-addr').value.trim();
+    const updated = current.trimEnd() + `\n${name}=${url}\n`;
+    await ghPut('urls.cfg', updated, urlFile.sha, `urls: add ${name}`);
+    document.getElementById('url-name').value = '';
+    document.getElementById('url-addr').value = '';
+    flash(`Added ${name}`);
+    await load();
+  } catch(err) { flash(err.message, true); }
+  setSaving(false);
+}
+
+async function removeUrl(name) {
+  if (_saving) return;
+  if (!confirm(`Remove ${name}?`)) return;
+  setSaving(true);
+  try {
+    const urlFile = await ghGet('urls.cfg');
+    const current = decodeURIComponent(escape(atob(urlFile.content)));
+    const updated = current.split('\n').filter(l => !l.startsWith(`${name}=`)).join('\n');
+    await ghPut('urls.cfg', updated, urlFile.sha, `urls: remove ${name}`);
+    flash(`Removed ${name}`);
+    await load();
+  } catch(err) { flash(err.message, true); }
+  setSaving(false);
+}
+
+async function init() {
+  const token = getToken();
+  if (!token) {
+    document.getElementById('token-gate').style.display = '';
+    return;
+  }
+  document.getElementById('token-gate').style.display = 'none';
+  document.getElementById('app').style.display = '';
+  try { await load(); } catch(err) {
+    if (err.message.includes('401') || err.message.includes('403')) {
+      flash('Invalid token', true);
+      clearToken();
+    } else flash(err.message, true);
+  }
+}
+
+init();
+</script>
+</body>
+</html>
