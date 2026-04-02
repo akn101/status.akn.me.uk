@@ -8,10 +8,10 @@
   <style>
     .admin-wrap { max-width: 640px; margin: 0 auto; padding: 40px 20px 80px; text-align: left; }
     .admin-header { display: flex; align-items: center; gap: 16px; margin-bottom: 32px; flex-wrap: wrap; }
-    .admin-header h1 { font-size: 20px; }
+    .admin-header h1 { font-size: 20px; margin: 0; }
     .back { font-size: 13px; color: #999; text-decoration: none; }
     .back:hover { color: #555; }
-    .msg { font-size: 13px; color: #16a34a; margin-left: auto; }
+    .msg { font-size: 13px; color: #16a34a; }
     .msg.err { color: #dc2626; }
     section { margin-bottom: 36px; }
     h2 { font-size: 11px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: #999; margin: 0 0 12px; }
@@ -37,24 +37,14 @@
     .submit-btn { align-self: flex-start; background: rgba(102,126,234,.12); color: #4f46e5; border: 1px solid rgba(102,126,234,.25); border-radius: 8px; padding: 8px 20px; font-size: 13px; cursor: pointer; font-family: inherit; }
     .submit-btn:hover:not(:disabled) { background: rgba(102,126,234,.2); }
     .submit-btn:disabled { opacity: .4; cursor: default; }
-    #token-gate { max-width: 400px; margin: 80px auto; padding: 0 20px; text-align: center; }
-    #token-gate h2 { font-size: 15px; color: #555; margin-bottom: 16px; text-transform: none; letter-spacing: 0; }
-    #token-gate input { width: 100%; margin-bottom: 10px; }
   </style>
 </head>
 <body>
-  <div id="token-gate" style="display:none">
-    <h2>Enter GitHub Personal Access Token<br><small style="font-size:11px;color:#aaa">(needs repo write access to akn101/status.akn.me.uk)</small></h2>
-    <input type="password" id="pat-input" placeholder="ghp_..." />
-    <button class="submit-btn" style="width:100%" onclick="saveToken()">Save</button>
-  </div>
-
   <div id="app" style="display:none" class="admin-wrap">
     <div class="admin-header">
       <a href="/" class="back">← status</a>
       <h1>admin</h1>
       <span id="msg" class="msg" style="display:none"></span>
-      <button class="btn btn-remove" style="margin-left:auto" onclick="clearToken()">sign out</button>
     </div>
 
     <section>
@@ -66,7 +56,7 @@
         <input id="inc-service" placeholder="service (e.g. Halcyon)" required />
         <input id="inc-url" placeholder="url (e.g. https://akn.me.uk)" />
         <textarea id="inc-desc" placeholder="description" rows="3"></textarea>
-        <button type="submit" class="submit-btn" id="inc-btn">create incident</button>
+        <button type="submit" class="submit-btn">create incident</button>
       </form>
     </section>
 
@@ -77,52 +67,14 @@
       <form onsubmit="addUrl(event)">
         <input id="url-name" placeholder="name (e.g. Halcyon)" required />
         <input id="url-addr" placeholder="url (e.g. https://akn.me.uk)" required />
-        <button type="submit" class="submit-btn" id="url-btn">add url</button>
+        <button type="submit" class="submit-btn">add url</button>
       </form>
     </section>
   </div>
 
 <script>
-const REPO = 'akn101/status.akn.me.uk';
-const API  = 'https://api.github.com';
-let _sha_incidents = null, _sha_urls = null;
+const API = 'https://api.akn.me.uk/status';
 let _saving = false;
-
-function getToken() { return localStorage.getItem('status_admin_pat'); }
-function saveToken() {
-  const t = document.getElementById('pat-input').value.trim();
-  if (!t) return;
-  localStorage.setItem('status_admin_pat', t);
-  init();
-}
-function clearToken() { localStorage.removeItem('status_admin_pat'); location.reload(); }
-
-function gh(path, opts = {}) {
-  return fetch(`${API}/repos/${REPO}/contents/${path}`, {
-    ...opts,
-    headers: {
-      Authorization: `Bearer ${getToken()}`,
-      Accept: 'application/vnd.github+json',
-      ...(opts.headers || {}),
-    },
-  });
-}
-
-async function ghGet(path) {
-  const r = await gh(path);
-  if (!r.ok) throw new Error(`GET ${path}: ${r.status}`);
-  return r.json();
-}
-
-async function ghPut(path, content, sha, message) {
-  const r = await gh(path, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, content: btoa(unescape(encodeURIComponent(content))), sha }),
-  });
-  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(JSON.stringify(e)); }
-  return r.json();
-}
 
 function flash(msg, err = false) {
   const el = document.getElementById('msg');
@@ -137,15 +89,28 @@ function setSaving(v) {
   document.querySelectorAll('button').forEach(b => b.disabled = v);
 }
 
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function api(path, opts = {}) {
+  const r = await fetch(`${API}${path}`, {
+    ...opts,
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
+  });
+  if (r.status === 401 || r.status === 403) {
+    window.location.href = `https://id.akn.me.uk?redirect=${encodeURIComponent(window.location.href)}`;
+    throw new Error('redirecting');
+  }
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || r.status); }
+  return r.json();
+}
+
 async function load() {
-  const [incFile, urlFile] = await Promise.all([ghGet('incidents.json'), ghGet('urls.cfg')]);
-  _sha_incidents = incFile.sha;
-  _sha_urls = urlFile.sha;
-  const incidents = JSON.parse(decodeURIComponent(escape(atob(incFile.content))));
-  const urlsRaw = decodeURIComponent(escape(atob(urlFile.content)));
-  renderIncidents(incidents.active || []);
-  renderUrls(urlsRaw);
-  return { incidents, urlsRaw };
+  const data = await api('');
+  renderIncidents(data.incidents.active || []);
+  renderUrls(data.urls || []);
 }
 
 function renderIncidents(active) {
@@ -163,11 +128,7 @@ function renderIncidents(active) {
   `).join('');
 }
 
-function renderUrls(raw) {
-  const urls = raw.split('\n').filter(Boolean).map(l => {
-    const [name, ...rest] = l.split('=');
-    return { name: name.trim(), url: rest.join('=').trim() };
-  }).filter(u => u.name && u.url);
+function renderUrls(urls) {
   const el = document.getElementById('url-list');
   el.innerHTML = urls.map(u => `
     <div class="row">
@@ -180,36 +141,27 @@ function renderUrls(raw) {
   `).join('');
 }
 
-function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-
 async function createIncident(e) {
   e.preventDefault();
   if (_saving) return;
   setSaving(true);
   try {
-    const incFile = await ghGet('incidents.json');
-    const incidents = JSON.parse(decodeURIComponent(escape(atob(incFile.content))));
-    const now = new Date().toISOString();
-    const title = document.getElementById('inc-title').value.trim();
-    const service = document.getElementById('inc-service').value.trim();
-    const url = document.getElementById('inc-url').value.trim();
-    const description = document.getElementById('inc-desc').value.trim();
-    incidents.active.unshift({
-      incidentId: `${service}-${now}`,
-      date: now.split('T')[0],
-      startTime: now,
-      endTime: now,
-      title, description, service, url,
-      status: 'investigating',
+    await api('/incident', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: document.getElementById('inc-title').value.trim(),
+        service: document.getElementById('inc-service').value.trim(),
+        url: document.getElementById('inc-url').value.trim(),
+        description: document.getElementById('inc-desc').value.trim(),
+      }),
     });
-    await ghPut('incidents.json', JSON.stringify(incidents, null, 2), incFile.sha, `incident: ${title}`);
     document.getElementById('inc-title').value = '';
     document.getElementById('inc-service').value = '';
     document.getElementById('inc-url').value = '';
     document.getElementById('inc-desc').value = '';
     flash('Incident created');
     await load();
-  } catch(err) { flash(err.message, true); }
+  } catch(err) { if (err.message !== 'redirecting') flash(err.message, true); }
   setSaving(false);
 }
 
@@ -217,20 +169,10 @@ async function resolveIncident(id) {
   if (_saving) return;
   setSaving(true);
   try {
-    const incFile = await ghGet('incidents.json');
-    const incidents = JSON.parse(decodeURIComponent(escape(atob(incFile.content))));
-    const idx = incidents.active.findIndex(i => i.incidentId === id);
-    if (idx === -1) throw new Error('not found');
-    const inc = incidents.active[idx];
-    const now = new Date();
-    const resolved = { ...inc, endTime: now.toISOString(), resolved: `${now.toUTCString()} - Service restored` };
-    delete resolved.status;
-    incidents.active.splice(idx, 1);
-    incidents.resolved.unshift(resolved);
-    await ghPut('incidents.json', JSON.stringify(incidents, null, 2), incFile.sha, `incident resolved: ${inc.title}`);
+    await api('/incident', { method: 'PATCH', body: JSON.stringify({ incidentId: id, action: 'resolve' }) });
     flash('Resolved');
     await load();
-  } catch(err) { flash(err.message, true); }
+  } catch(err) { if (err.message !== 'redirecting') flash(err.message, true); }
   setSaving(false);
 }
 
@@ -239,17 +181,13 @@ async function addUrl(e) {
   if (_saving) return;
   setSaving(true);
   try {
-    const urlFile = await ghGet('urls.cfg');
-    const current = decodeURIComponent(escape(atob(urlFile.content)));
     const name = document.getElementById('url-name').value.trim();
-    const url = document.getElementById('url-addr').value.trim();
-    const updated = current.trimEnd() + `\n${name}=${url}\n`;
-    await ghPut('urls.cfg', updated, urlFile.sha, `urls: add ${name}`);
+    await api('/url', { method: 'POST', body: JSON.stringify({ name, url: document.getElementById('url-addr').value.trim() }) });
     document.getElementById('url-name').value = '';
     document.getElementById('url-addr').value = '';
     flash(`Added ${name}`);
     await load();
-  } catch(err) { flash(err.message, true); }
+  } catch(err) { if (err.message !== 'redirecting') flash(err.message, true); }
   setSaving(false);
 }
 
@@ -258,30 +196,16 @@ async function removeUrl(name) {
   if (!confirm(`Remove ${name}?`)) return;
   setSaving(true);
   try {
-    const urlFile = await ghGet('urls.cfg');
-    const current = decodeURIComponent(escape(atob(urlFile.content)));
-    const updated = current.split('\n').filter(l => !l.startsWith(`${name}=`)).join('\n');
-    await ghPut('urls.cfg', updated, urlFile.sha, `urls: remove ${name}`);
+    await api('/url', { method: 'DELETE', body: JSON.stringify({ name }) });
     flash(`Removed ${name}`);
     await load();
-  } catch(err) { flash(err.message, true); }
+  } catch(err) { if (err.message !== 'redirecting') flash(err.message, true); }
   setSaving(false);
 }
 
 async function init() {
-  const token = getToken();
-  if (!token) {
-    document.getElementById('token-gate').style.display = '';
-    return;
-  }
-  document.getElementById('token-gate').style.display = 'none';
   document.getElementById('app').style.display = '';
-  try { await load(); } catch(err) {
-    if (err.message.includes('401') || err.message.includes('403')) {
-      flash('Invalid token', true);
-      clearToken();
-    } else flash(err.message, true);
-  }
+  try { await load(); } catch(err) { /* 401 handler redirects */ }
 }
 
 init();
