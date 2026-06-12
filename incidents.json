@@ -24,12 +24,12 @@
       "resolved": "2026-02-27 08:24:00 GMT - Service restored"
     },
     {
-      "incidentId": "EtonSTEM-2026-02-24T20:51:00.000Z",
+      "incidentId": "EtonSTEM-2026-02-24T21:46:00.000Z",
       "date": "2026-02-24",
-      "startTime": "2026-02-24T20:51:00.000Z",
+      "startTime": "2026-02-24T21:46:00.000Z",
       "endTime": "2026-02-25T08:29:00.000Z",
       "title": "EtonSTEM Extended Outage",
-      "description": "EtonSTEM (https://etonstem.com) has been inaccessible for approximately 12 hours since 2026-02-24 20:51:00 GMT.",
+      "description": "EtonSTEM (https://etonstem.com) has been inaccessible for approximately 11 hours since 2026-02-24 21:46:00 GMT.",
       "service": "EtonSTEM",
       "url": "https://etonstem.com",
       "resolved": "2026-02-25 08:29:00 GMT - Service restored"
