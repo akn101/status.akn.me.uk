@@ -4,13 +4,13 @@
       "incidentId": "EtonSTEM-2026-06-18T00:23:00.000Z",
       "date": "2026-06-18",
       "startTime": "2026-06-18T00:23:00.000Z",
-      "endTime": "2026-06-18T16:47:00.000Z",
+      "endTime": "2026-06-18T19:13:00.000Z",
       "title": "EtonSTEM Extended Outage",
-      "description": "EtonSTEM (https://etonstem.com) has been inaccessible for approximately 16 hours since 2026-06-18 00:23:00 GMT.",
+      "description": "EtonSTEM (https://etonstem.com) has been inaccessible for approximately 19 hours since 2026-06-18 00:23:00 GMT.",
       "service": "EtonSTEM",
       "url": "https://etonstem.com",
       "status": "investigating",
-      "eta": "2026-06-19T16:47:49.460Z"
+      "eta": "2026-06-19T19:14:27.433Z"
     }
   ],
   "resolved": [
@@ -26,12 +26,12 @@
       "resolved": "2026-05-14 05:34:00 GMT - Service restored"
     },
     {
-      "incidentId": "EtonSTEM-2026-02-27T05:41:00.000Z",
+      "incidentId": "EtonSTEM-2026-02-27T06:33:00.000Z",
       "date": "2026-02-27",
-      "startTime": "2026-02-27T05:41:00.000Z",
+      "startTime": "2026-02-27T06:33:00.000Z",
       "endTime": "2026-02-27T08:24:00.000Z",
       "title": "EtonSTEM Extended Outage",
-      "description": "EtonSTEM (https://etonstem.com) has been inaccessible for approximately 3 hours since 2026-02-27 05:41:00 GMT.",
+      "description": "EtonSTEM (https://etonstem.com) has been inaccessible for approximately 2 hours since 2026-02-27 06:33:00 GMT.",
       "service": "EtonSTEM",
       "url": "https://etonstem.com",
       "resolved": "2026-02-27 08:24:00 GMT - Service restored"
