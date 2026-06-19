@@ -1,5 +1,6 @@
 {
-  "active": [
+  "active": [],
+  "resolved": [
     {
       "incidentId": "EtonSTEM-2026-06-18T00:23:00.000Z",
       "date": "2026-06-18",
@@ -9,11 +10,8 @@
       "description": "EtonSTEM (https://etonstem.com) has been inaccessible for approximately 23 hours since 2026-06-18 00:23:00 GMT.",
       "service": "EtonSTEM",
       "url": "https://etonstem.com",
-      "status": "investigating",
-      "eta": "2026-06-19T23:24:38.762Z"
-    }
-  ],
-  "resolved": [
+      "resolved": "2026-06-18 23:24:00 GMT - Service restored"
+    },
     {
       "incidentId": "EtonSTEM-2026-03-26T15:18:00.000Z",
       "date": "2026-03-26",
