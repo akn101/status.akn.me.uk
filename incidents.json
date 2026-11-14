@@ -1,5 +1,18 @@
 {
-  "active": [],
+  "active": [
+    {
+      "incidentId": "Thoughts-2026-11-14T20:05:00.000Z",
+      "date": "2026-11-14",
+      "startTime": "2026-11-14T20:05:00.000Z",
+      "endTime": "2026-11-14T23:50:00.000Z",
+      "title": "Thoughts Extended Outage",
+      "description": "Thoughts (https://thoughts.akn.me.uk) has been inaccessible for approximately 4 hours since 2026-11-14 20:05:00 GMT.",
+      "service": "Thoughts",
+      "url": "https://thoughts.akn.me.uk",
+      "status": "investigating",
+      "eta": "2026-11-15T23:50:53.143Z"
+    }
+  ],
   "resolved": [
     {
       "incidentId": "EtonSTEM-2026-06-18T00:23:00.000Z",
