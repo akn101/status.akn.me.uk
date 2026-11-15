@@ -1,5 +1,6 @@
 {
-  "active": [
+  "active": [],
+  "resolved": [
     {
       "incidentId": "Thoughts-2026-11-14T20:05:00.000Z",
       "date": "2026-11-14",
@@ -9,11 +10,8 @@
       "description": "Thoughts (https://thoughts.akn.me.uk) has been inaccessible for approximately 4 hours since 2026-11-14 20:05:00 GMT.",
       "service": "Thoughts",
       "url": "https://thoughts.akn.me.uk",
-      "status": "investigating",
-      "eta": "2026-11-15T23:50:53.143Z"
-    }
-  ],
-  "resolved": [
+      "resolved": "2026-11-14 23:50:00 GMT - Service restored"
+    },
     {
       "incidentId": "EtonSTEM-2026-06-18T00:23:00.000Z",
       "date": "2026-06-18",
